@@ -1,0 +1,58 @@
+dados = { 
+    chave = "xxxxxxxxxxxxx",
+    temperatura = 315, 
+    umidade = 59,
+    contador=0}
+
+function le_dht22()
+    status,temp,humi,temp_dec,humi_dec = dht.readxx(3)
+    if(status==dht.OK)then
+        print("DHT: ok!")
+        dados.temperatura=temp
+        dados.umidade=humi
+        dados.contador=dados.contador+1
+    elseif (status==dht.ERROR_CHECKSUM) then
+        print("DHT: Checksum error")
+    elseif (status==dht.ERROR_TIMEOUT) then
+        print("DHT: timeout error")
+        dados.umidade=math.random(0,40)
+        dados.temperatura=math.random(0,40)
+        dados.contador = dados.contador+1
+    end
+end
+
+function envia_dados()
+    gpio.mode(1,gpio.OUTPUT)
+    gpio.write(1,gpio.LOW)
+    le_dht22()
+    print("Temp: "..dados.temperatura.." HR: "..dados.umidade)
+    http.post("https://maker.ifttt.com/trigger/dht_11/with/key/xxxxxxxx",
+              "Content-Type: application/json\r\n",
+              "{\"value1\":"..dados.temperatura..",\"value2\":"..dados.umidade..",\"value3\":"..dados.contador.."}",
+              function (code,data)
+                print("Codigo: "..code)
+                print(data)
+                gpio.write(1,gpio.HIGH)
+              end)
+end
+
+function blink()
+    gpio.mode(2,gpio.OUTPUT)
+    gpio.write(2,1-gpio.read(2))
+end
+
+function inicia()        
+    wifi.setmode(wifi.STATION)
+    wifi.sta.config("ssid","password")
+    tmr.unregister(1)
+    tmr.unregister(2)
+    tmr.alarm(1,1000*60*5,tmr.ALARM_AUTO,envia_dados)
+    tmr.alarm(2,1000,tmr.ALARM_AUTO,blink)
+    envia_dados()
+end
+
+function para()
+    timer.unregister(1)
+end
+
+inicia()
